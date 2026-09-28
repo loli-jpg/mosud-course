@@ -1,0 +1,11 @@
+﻿# PostgreSQL
+*.log
+*.pid
+*.lock
+data/
+*.csv
+*.zip
+.env
+docker-compose.override.yml
+.DS_Store
+Thumbs.db
