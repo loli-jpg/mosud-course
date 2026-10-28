@@ -2,12 +2,11 @@
 -- ФИО: Газдиева Лоли Магомедовна
 -- Группа: ИНБО-21-23
 -- Вариант: 6
-
 -- Показать, что разность некоммутативна.
 
 DROP VIEW IF EXISTS lab.a CASCADE;
 DROP VIEW IF EXISTS lab.b CASCADE;
--- Множество A. product_id товаров, купленных клиентами из ES
+-- Множество A ES
 CREATE VIEW lab.a AS
 SELECT oi.product_id
 FROM olist.order_items oi
@@ -23,9 +22,9 @@ JOIN olist.orders o ON o.order_id = oi.order_id
 JOIN olist.customers c ON c.customer_id = o.customer_id
 WHERE o.order_status = 'delivered' AND c.customer_state = 'RJ';
 
--- A union B (множество без дубликатов)
+-- A union B
 SELECT count(*) AS union_count FROM (SELECT * FROM lab.a UNION SELECT * FROM lab.b) x;
--- A union all B (мультимножество с дубликатами)
+-- A union all B
 SELECT count(*) AS union_all_count FROM (SELECT * FROM lab.a UNION ALL SELECT * FROM lab.b) x;
 -- A intersect B
 SELECT count(*) AS intersect_count FROM (SELECT * FROM lab.a INTERSECT SELECT * FROM lab.b) x;

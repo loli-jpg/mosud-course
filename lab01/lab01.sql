@@ -134,7 +134,6 @@ ALTER TABLE olist.order_payments ADD CONSTRAINT fk_payments_order
 ALTER TABLE olist.order_reviews ADD CONSTRAINT fk_reviews_order
     FOREIGN KEY (order_id) REFERENCES olist.orders(order_id);
 
--- Контрольные проверки
 -- Кол-во строк в таблицах 
 SELECT 'customers' AS table_name, count(*) FROM olist.customers
 UNION ALL SELECT 'geolocation', count(*) FROM olist.geolocation

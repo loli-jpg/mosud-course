@@ -6,13 +6,7 @@
 -- Предикат: review_score <= 2 AND review_comment_message IS NOT NULL
 -- Проекция: order_id, review_score, review_comment_message
 
--- Реляционное выражение:
--- π_{order_id, review_score, review_comment_message}(
---   σ_{review_score <= 2 AND review_comment_message IS NOT NULL}(order_reviews)
--- )
-
--- 1. Исходное выражение одним запросом
--- Проверяем: сколько отзывов с низким баллом и непустым комментарием
+-- сколько отзывов с низким баллом и непустым комментарием
 SELECT
     order_id,
     review_score,
@@ -20,7 +14,7 @@ SELECT
 FROM olist.order_reviews
 WHERE review_score <= 2 AND review_comment_message IS NOT NULL;
 
--- 2. Разбиваем предикат на две последовательные выборки
+-- Разбиваем предикат на две последовательные выборки
 -- Сначала фильтруем по review_score, затем по comment_message
 -- Проверяем эквивалентность с запросом 1
 SELECT
@@ -34,7 +28,7 @@ FROM (
 ) t
 WHERE review_comment_message IS NOT NULL;
 
--- 3. Второй вариант: сначала применяем проекцию, потом фильтруем
+-- сначала применяем проекцию, потом фильтруем
 -- Ненужные столбцы исключаются раньше - меньше данных проходит через фильтры
 -- Проверяем эквивалентность с запросом 1
 SELECT
@@ -68,15 +62,14 @@ SELECT 'variant 3 (project early)', count(*) FROM (
     WHERE review_score <= 2 AND review_comment_message IS NOT NULL
 ) x;
 
--- 5. Проверка на дубликаты: в проекции возможны повторы
--- Если несколько отзывов имеют одинаковые order_id и score - будут дубликаты
+-- Проверка на дубликаты
 SELECT count(*) AS total_rows,
        count(DISTINCT (order_id, review_score, review_comment_message)) AS distinct_rows
 FROM olist.order_reviews
 WHERE review_score <= 2
   AND review_comment_message IS NOT NULL;
 
--- 6. SELECT DISTINCT - убираем дубликаты, если они есть
+-- убираем дубликаты, если они есть
 -- Проверяем, меняется ли количество строк
 SELECT DISTINCT
     order_id,
@@ -86,7 +79,6 @@ FROM olist.order_reviews
 WHERE review_score <= 2
   AND review_comment_message IS NOT NULL;
 
--- 7. Мощности для сравнения SELECT и SELECT DISTINCT
 -- Проверяем, возникли ли дубликаты в проекции
 SELECT 'SELECT' AS variant, count(*) AS rows FROM (
     SELECT order_id, review_score, review_comment_message
