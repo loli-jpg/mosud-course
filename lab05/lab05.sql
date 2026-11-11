@@ -52,7 +52,7 @@ GROUP BY product_category_name
 HAVING COUNT(DISTINCT customer_state) = (SELECT COUNT(*) FROM target_states)
 ORDER BY product_category_name;
 
--- 4. EXCEPT
+-- 4. EXCEPT (категории которые хотя бы раз продавались в нужном штате - категории которые продавались не во всех штатх)
 WITH target_states AS (
     SELECT unnest(ARRAY['PA','AM','RO']) AS customer_state
 ),
@@ -95,8 +95,9 @@ r1 AS (
             FROM olist.order_items oi
             JOIN olist.orders o ON o.order_id = oi.order_id
             JOIN olist.customers c ON c.customer_id = o.customer_id
+            JOIN olist.products p2 ON p2.product_id = oi.product_id
             WHERE o.order_status = 'delivered'
-            AND oi.product_id = p.product_id
+            AND p2.product_category_name = p.product_category_name
             AND c.customer_state = ts.customer_state
         )
     )
@@ -113,11 +114,9 @@ r2 AS (
     GROUP BY p.product_category_name
     HAVING COUNT(DISTINCT c.customer_state) = (SELECT COUNT(*) FROM target_states)
 )
-SELECT 'r1 EXCEPT r2' AS side, COUNT(*) AS diff
-FROM (SELECT * FROM r1 EXCEPT SELECT * FROM r2) x
-UNION ALL
-SELECT 'r2 EXCEPT r1', COUNT(*)
-FROM (SELECT * FROM r2 EXCEPT SELECT * FROM r1) x;
+SELECT * FROM r2
+EXCEPT
+SELECT * FROM r1;
 
 -- 6. Диагностика для одной категории
 WITH target_states AS (
@@ -166,9 +165,9 @@ AND NOT EXISTS (
         AND oi.product_id = p.product_id
         AND c.customer_state = ts.customer_state
     )
-);
+);--все кат попадут в рез-т
 
--- 7b. Пустой target_states: GROUP BY / HAVING
+-- Пустой target_states: GROUP BY / HAVING
 WITH target_states AS (
     SELECT unnest(ARRAY[]::text[]) AS customer_state
 )
@@ -181,7 +180,7 @@ WHERE o.order_status = 'delivered'
 AND p.product_category_name IS NOT NULL
 AND c.customer_state IN (SELECT customer_state FROM target_states)
 GROUP BY p.product_category_name
-HAVING COUNT(DISTINCT c.customer_state) = (SELECT COUNT(*) FROM target_states);
+HAVING COUNT(DISTINCT c.customer_state) = (SELECT COUNT(*) FROM target_states);--ноль категорий
 
 -- 8. Продавцы, продававшие во всех штатах S
 WITH target_states AS (

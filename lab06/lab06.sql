@@ -1,72 +1,85 @@
-﻿-- Практическая работа №6: Подзапросы и логика предикатов
--- ФИО: Газдиева Л.М.
+﻿﻿-- Практическая работа №9: Функциональные зависимости и нормализация
+-- ФИО: Газдиева ЛМ
 -- Группа: ИНБО-21-23
--- Вариант: 6 (сумма платежей > сумма price+freight по позициям)
+-- Вариант: 6 (delivery_flat)
 
--- 1. Основное решение: скалярный подзапрос + EXISTS
-SELECT o.order_id
-FROM olist.orders o
-WHERE o.order_status = 'delivered'
-AND (SELECT SUM(op.payment_value) FROM olist.order_payments op WHERE op.order_id = o.order_id)
-    > (SELECT SUM(oi.price + oi.freight_value) FROM olist.order_items oi WHERE oi.order_id = o.order_id)
-AND EXISTS (SELECT 1 FROM olist.order_payments op WHERE op.order_id = o.order_id)
-AND EXISTS (SELECT 1 FROM olist.order_items oi WHERE oi.order_id = o.order_id)
-ORDER BY o.order_id;
+DROP TABLE IF EXISTS lab.nf_v6_attempts CASCADE;
+DROP TABLE IF EXISTS lab.nf_v6_shipments CASCADE;
+DROP TABLE IF EXISTS lab.nf_v6_events CASCADE;
+DROP TABLE IF EXISTS lab.nf_v6_sellers CASCADE;
 
--- 2. Альтернатива: JOIN + CTE с предварительной агрегацией
-WITH pay AS (
-    SELECT order_id, SUM(payment_value) AS total_paid
-    FROM olist.order_payments
-    GROUP BY order_id
-),
-items AS (
-    SELECT order_id, SUM(price + freight_value) AS total_items
-    FROM olist.order_items
-    GROUP BY order_id
-)
-SELECT o.order_id
-FROM olist.orders o
-JOIN pay p ON p.order_id = o.order_id
-JOIN items i ON i.order_id = o.order_id
-WHERE o.order_status = 'delivered'
-AND p.total_paid > i.total_items
-ORDER BY o.order_id;
+CREATE TABLE lab.nf_v6_sellers (
+    seller_id text NOT NULL,
+    seller_city text NOT NULL,
+    CONSTRAINT pk_nf_v6_sellers PRIMARY KEY (seller_id)
+);
 
--- 3. Проверка эквивалентности
-WITH main AS (
-    SELECT o.order_id
-    FROM olist.orders o
-    WHERE o.order_status = 'delivered'
-    AND (SELECT SUM(op.payment_value) FROM olist.order_payments op WHERE op.order_id = o.order_id)
-        > (SELECT SUM(oi.price + oi.freight_value) FROM olist.order_items oi WHERE oi.order_id = o.order_id)
-    AND EXISTS (SELECT 1 FROM olist.order_payments op WHERE op.order_id = o.order_id)
-    AND EXISTS (SELECT 1 FROM olist.order_items oi WHERE oi.order_id = o.order_id)
-),
-alt AS (
-    SELECT o.order_id
-    FROM olist.orders o
-    JOIN (SELECT order_id, SUM(payment_value) AS total_paid FROM olist.order_payments GROUP BY order_id) p
-        ON p.order_id = o.order_id
-    JOIN (SELECT order_id, SUM(price + freight_value) AS total_items FROM olist.order_items GROUP BY order_id) i
-        ON i.order_id = o.order_id
-    WHERE o.order_status = 'delivered'
-    AND p.total_paid > i.total_items
-)
-SELECT 'main EXCEPT alt' AS side, COUNT(*) AS diff FROM (SELECT * FROM main EXCEPT SELECT * FROM alt) x
-UNION ALL
-SELECT 'alt EXCEPT main', COUNT(*) FROM (SELECT * FROM alt EXCEPT SELECT * FROM main) x;
+CREATE TABLE lab.nf_v6_events (
+    event_code text NOT NULL,
+    event_name text NOT NULL,
+    CONSTRAINT pk_nf_v6_events PRIMARY KEY (event_code)
+);
 
--- 4. Демонстрация ANY: заказы, где хотя бы один платёж больше 1000
-SELECT o.order_id
-FROM olist.orders o
-WHERE o.order_status = 'delivered'
-AND 1000 < ANY (SELECT op.payment_value FROM olist.order_payments op WHERE op.order_id = o.order_id)
-LIMIT 10;
+CREATE TABLE lab.nf_v6_shipments (
+    shipment_id integer NOT NULL,
+    order_id text NOT NULL,
+    seller_id text NOT NULL,
+    CONSTRAINT pk_nf_v6_shipments PRIMARY KEY (shipment_id),
+    CONSTRAINT fk_nf_v6_ship_seller FOREIGN KEY (seller_id)
+        REFERENCES lab.nf_v6_sellers(seller_id)
+);
 
--- 5. Демонстрация ALL: заказы, где все позиции дороже 100
-SELECT o.order_id
-FROM olist.orders o
-WHERE o.order_status = 'delivered'
-AND 100 < ALL (SELECT oi.price FROM olist.order_items oi WHERE oi.order_id = o.order_id)
-AND EXISTS (SELECT 1 FROM olist.order_items oi WHERE oi.order_id = o.order_id)
-LIMIT 10;
+CREATE TABLE lab.nf_v6_attempts (
+    shipment_id integer NOT NULL,
+    attempt_no integer NOT NULL,
+    attempt_time timestamp NOT NULL,
+    event_code text NOT NULL,
+    CONSTRAINT pk_nf_v6_attempts PRIMARY KEY (shipment_id, attempt_no),
+    CONSTRAINT fk_nf_v6_attempt_ship FOREIGN KEY (shipment_id)
+        REFERENCES lab.nf_v6_shipments(shipment_id),
+    CONSTRAINT fk_nf_v6_attempt_event FOREIGN KEY (event_code)
+        REFERENCES lab.nf_v6_events(event_code),
+    CONSTRAINT ck_nf_v6_attempt_no CHECK (attempt_no > 0)
+);
+
+INSERT INTO lab.nf_v6_sellers VALUES
+    ('s1', 'São Paulo'),
+    ('s2', 'Rio de Janeiro'),
+    ('s3', 'Curitiba');
+
+INSERT INTO lab.nf_v6_events VALUES
+    ('EV01', 'created'),
+    ('EV02', 'dispatched'),
+    ('EV03', 'delivered');
+
+INSERT INTO lab.nf_v6_shipments VALUES
+    (1001, 'order_aaa', 's1'),
+    (1002, 'order_bbb', 's1'),
+    (1003, 'order_ccc', 's2'),
+    (1004, 'order_ddd', 's3');
+
+INSERT INTO lab.nf_v6_attempts VALUES
+    (1001, 1, '2026-01-01 10:00', 'EV01'),
+    (1001, 2, '2026-01-02 11:00', 'EV02'),
+    (1002, 1, '2026-01-03 12:00', 'EV01'),
+    (1002, 2, '2026-01-04 13:00', 'EV03'),
+    (1003, 1, '2026-01-05 14:00', 'EV01');
+
+SELECT 'sellers' AS table_name, COUNT(*) AS rows FROM lab.nf_v6_sellers
+UNION ALL SELECT 'events', COUNT(*) FROM lab.nf_v6_events
+UNION ALL SELECT 'shipments', COUNT(*) FROM lab.nf_v6_shipments
+UNION ALL SELECT 'attempts', COUNT(*) FROM lab.nf_v6_attempts;
+
+-- Проверка: город продавца хранится один раз
+SELECT s.seller_id, s.seller_city, COUNT(sh.shipment_id) AS shipments_count
+FROM lab.nf_v6_sellers s
+LEFT JOIN lab.nf_v6_shipments sh ON sh.seller_id = s.seller_id
+GROUP BY s.seller_id, s.seller_city
+ORDER BY s.seller_id;
+
+-- Проверка: название события хранится один раз
+SELECT e.event_code, e.event_name, COUNT(a.attempt_no) AS attempts_count
+FROM lab.nf_v6_events e
+LEFT JOIN lab.nf_v6_attempts a ON a.event_code = e.event_code
+GROUP BY e.event_code, e.event_name
+ORDER BY e.event_code;

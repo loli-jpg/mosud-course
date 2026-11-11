@@ -7,7 +7,6 @@
 -- Проекция: order_id, review_score, review_comment_message
 
 -- Основной запрос
-
 SELECT
     c.customer_unique_id,
     COUNT(DISTINCT o.order_id) AS order_count,
@@ -15,8 +14,8 @@ SELECT
     MAX(o.order_purchase_timestamp) AS last_order,
     SUM(op.payment_value) AS total_paid
 FROM olist.customers c
-JOIN olist.orders o         ON o.customer_id = c.customer_id   -- 1:N
-JOIN olist.order_payments op ON op.order_id = o.order_id       -- 1:N
+JOIN olist.orders o         ON o.customer_id = c.customer_id -- 1:N
+JOIN olist.order_payments op ON op.order_id = o.order_id -- 1:N
 GROUP BY c.customer_unique_id
 ORDER BY order_count DESC
 LIMIT 10;
